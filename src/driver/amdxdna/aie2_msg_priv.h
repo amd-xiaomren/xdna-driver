@@ -40,6 +40,9 @@ enum aie2_msg_opcode {
 	MSG_OP_SET_RUNTIME_CONFIG          = 0x10A,
 	MSG_OP_GET_RUNTIME_CONFIG          = 0x10B,
 	MSG_OP_REGISTER_ASYNC_EVENT_MSG    = 0x10C,
+	IPU_MSG_START_EVENT_TRACE          = 0x10F,
+	IPU_MSG_STOP_EVENT_TRACE           = 0x110,
+	IPU_MSG_SET_EVENT_TRACE_CATEGORIES = 0x111,
 	MSG_OP_MAX_DRV_OPCODE,
 	MSG_OP_GET_PROTOCOL_VERSION        = 0x301,
 	MSG_OP_MAX_OPCODE
@@ -378,6 +381,51 @@ struct async_event_msg_req {
 struct async_event_msg_resp {
 	enum aie2_msg_status	status;
 	enum async_event_type	type;
+} __packed;
+
+enum event_trace_destination {
+	EVENT_TRACE_DEST_DEBUG_BUS,
+	EVENT_TRACE_DEST_DRAM,
+	EVENT_TRACE_DEST_COUNT
+};
+
+enum event_trace_timestamp {
+	EVENT_TRACE_TIMESTAMP_FW_CHRONO,
+	EVENT_TRACE_TIMESTAMP_CPU_CCOUNT,
+	EVENT_TRACE_TIMESTAMP_COUNT
+};
+
+#define EVENT_TRACE_CATEGORY_OVERVIEW (0x00000001u)
+#define EVENT_TRACE_CATEGORY_TCT      (0x00000002u)
+#define EVENT_TRACE_CATEGORY_LATENCY  (0x00000004u)
+struct start_event_trace_req {
+	u32				event_trace_categories;
+	enum event_trace_destination	event_trace_dest;
+	enum event_trace_timestamp	event_trace_timestamp;
+	u64				dram_buf_addr;
+	u32				dram_buf_size;
+} __packed;
+
+struct start_event_trace_resp {
+	enum aie2_msg_status		status;
+	u32				msi_idx;
+	u64				current_timestamp;
+} __packed;
+
+struct stop_event_trace_req {
+	u32				place_holder;
+} __packed;
+
+struct stop_event_trace_resp {
+	enum aie2_msg_status		status;
+} __packed;
+
+struct set_event_trace_categories_req {
+	u32				event_trace_categories;
+} __packed;
+
+struct set_event_trace_categories_resp {
+	enum aie2_msg_status		status;
 } __packed;
 
 #define MAX_CHAIN_CMDBUF_SIZE 0x1000
