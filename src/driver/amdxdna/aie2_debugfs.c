@@ -554,6 +554,84 @@ static int aie2_telemetry_debug_show(struct seq_file *m, void *unused)
 
 AIE2_DBGFS_FOPS(telemetry_debug, aie2_telemetry_debug_show, NULL);
 
+static inline int aie2_to_fw_logging_op(int op)
+{
+	switch (op) {
+	case -1: return FW_LOGGING_OP_FREE;
+	case 0: return FW_LOGGING_OP_STOP;
+	case 1: return FW_LOGGING_OP_START;
+	default: return -1;
+	}
+}
+
+static ssize_t
+aie2_fw_logging_write(struct file *file, const char __user *ptr, size_t len, loff_t *off)
+{
+	struct amdxdna_dev_hdl *ndev = file_to_ndev_rw(file);
+	struct amdxdna_dev *xdna = ndev->xdna;
+	// const size_t size = 0x10000; /* 1M */
+	// const size_t size = 0x100;
+	enum fw_logging_op op;
+	// dma_addr_t dma_addr;
+	// void *buff;
+	int ret, val;
+
+	ret = kstrtoint_from_user(ptr, len, 10, &val);
+	if (ret) {
+		XDNA_ERR(ndev->xdna, "Invalid input value: %d", val);
+		return ret;
+	}
+
+	op = aie2_to_fw_logging_op(val);
+	if (op < 0) {
+		XDNA_ERR(ndev->xdna, "Invalid op: %d", val);
+		return -EINVAL;
+	}
+
+	mutex_lock(&xdna->dev_lock);
+	ret = aie2_control_fw_logging(ndev, op, NULL);
+	mutex_unlock(&xdna->dev_lock);
+	if (ret) {
+		XDNA_ERR(xdna, "failed to control fw logging ret %d", ret);
+		return -EAGAIN;
+	}
+
+	return 0;
+}
+
+static void aie2_fw_logging_usage(struct seq_file *m)
+{
+	seq_puts(m, "firmware logging:\n");
+	seq_puts(m, "\techo <op> [args] > fw_logging\n");
+	seq_puts(m, "\t\top   - action (-1, 0, 1)\n");
+	seq_puts(m, "\t\t\t-1 : free internal buffer\n");
+	seq_puts(m, "\t\t\t0  : stop logging, then safe to read\n");
+	seq_puts(m, "\t\t\t1  : start logging\n");
+	seq_puts(m, "\t\targs - unsupported now\n");
+	seq_puts(m, "\n");
+}
+
+static int aie2_fw_logging_show(struct seq_file *m, void *unused)
+{
+	struct amdxdna_dev_hdl *ndev = m->private;
+	struct amdxdna_dev *xdna = ndev->xdna;
+	int ret;
+
+	if (!ndev->fw_logging.addr) {
+		aie2_fw_logging_usage(m);
+	} else if (ndev->fw_logging.on) {
+		seq_puts(m, "stop logging first\n");
+	} else {
+		seq_puts(m, "--- log start ---\n");
+		seq_puts(m, "......\n");
+		seq_puts(m, "--- log end ---\n");
+	}
+
+	return 0;
+}
+
+AIE2_DBGFS_FOPS(fw_logging, aie2_fw_logging_show, aie2_fw_logging_write);
+
 const struct {
 	const char *name;
 	const struct file_operations *fops;
@@ -572,6 +650,7 @@ const struct {
 	AIE2_DBGFS_FILE(telemetry_error_info, 0400),
 	AIE2_DBGFS_FILE(telemetry_profiling, 0400),
 	AIE2_DBGFS_FILE(telemetry_debug, 0400),
+	AIE2_DBGFS_FILE(fw_logging, 0600),
 };
 
 void aie2_debugfs_init(struct amdxdna_dev *xdna)

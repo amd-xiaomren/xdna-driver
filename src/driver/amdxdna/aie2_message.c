@@ -436,6 +436,46 @@ int aie2_register_asyn_event_msg(struct amdxdna_dev_hdl *ndev, dma_addr_t addr, 
 	return xdna_mailbox_send_msg(ndev->mgmt_chann, &msg, TX_TIMEOUT);
 }
 
+static int aie2_control_fw_logging_start(struct amdxdna_dev_hdl *ndev)
+{
+	DECLARE_AIE2_MSG(start_event_trace, IPU_MSG_START_EVENT_TRACE);
+
+	return 0;
+}
+
+static int aie2_control_fw_logging_stop(struct amdxdna_dev_hdl *ndev)
+{
+	DECLARE_AIE2_MSG(start_event_trace, IPU_MSG_STOP_EVENT_TRACE);
+
+	return 0;
+}
+
+static int aie2_control_fw_logging_free(struct amdxdna_dev_hdl *ndev)
+{
+	return 0;
+}
+
+int aie2_control_fw_logging(struct amdxdna_dev_hdl *ndev, enum fw_logging_op op, void *args)
+{
+	struct amdxdna_dev *xdna = ndev->xdna;
+	int ret;
+
+	switch (op) {
+	case FW_LOGGING_OP_START:
+		ret = aie2_control_fw_logging_start(ndev);
+	case FW_LOGGING_OP_STOP:
+		ret = aie2_control_fw_logging_stop(ndev);
+	case FW_LOGGING_OP_FREE:
+		ret = aie2_control_fw_logging_free(ndev);
+	case FW_LOGGING_OP_SET:
+		ret = 0;
+	default:
+		ret = -EPIPE;
+	}
+
+	return ret;
+}
+
 /* Below messages are to hardware context mailbox channel */
 int aie2_config_cu(struct amdxdna_hwctx *hwctx)
 {
