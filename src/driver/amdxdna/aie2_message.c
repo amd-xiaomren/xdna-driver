@@ -461,10 +461,6 @@ static int aie2_control_fw_logging_stop(struct amdxdna_dev_hdl *ndev)
 {
 	DECLARE_AIE2_MSG(stop_event_trace, IPU_MSG_STOP_EVENT_TRACE);
 	struct amdxdna_dev *xdna = ndev->xdna;
-	struct device *dev = xdna->ddev.dev;
-	const size_t size = ndev->fw_logging.size;
-	dma_addr_t dma_addr = ndev->fw_logging.dma_addr;
-	u8 *buff_addr = ndev->fw_logging.addr;
 	int ret;
 
 	XDNA_ERR(xdna, "Stop fw logging enter, on:%d", ndev->fw_logging.on);
@@ -483,7 +479,7 @@ static int aie2_control_fw_logging_stop(struct amdxdna_dev_hdl *ndev)
 	}
 
 	ndev->fw_logging.on = false;
-	XDNA_ERR(xdna, "Stop fw logging exit. curr_ts:%llu", resp.current_timestamp);
+	XDNA_ERR(xdna, "Stop fw logging exit.");
 	return 0;
 }
 
@@ -502,7 +498,7 @@ static int aie2_control_fw_logging_start(struct amdxdna_dev_hdl *ndev)
 	if (ndev->fw_logging.on)
 		return 0;
 
-	buff_addr = dma_alloc_coherent(dev, size, &dma_addr, DMA_BIDIRECTIONAL, GFP_KERNEL);
+	buff_addr = dma_alloc_coherent(dev, size, &dma_addr, GFP_KERNEL);
 	if (!buff_addr)
 		return -ENOMEM;
 	drm_clflush_virt_range(buff_addr, size); /* device can access */
@@ -529,7 +525,8 @@ static int aie2_control_fw_logging_start(struct amdxdna_dev_hdl *ndev)
 	ndev->fw_logging.size = size;
 	ndev->fw_logging.addr = buff_addr;
 	ndev->fw_logging.dma_addr = dma_addr;
-	ndev->fw_logging.metadata = (u8 *)buff_addr - sizeof(struct event_trace_metadata);
+	ndev->fw_logging.metadata = (struct event_trace_metadata *)
+			((u8 *)buff_addr + size - sizeof(struct event_trace_metadata));
 	ndev->fw_logging.msi_idx = resp.msi_idx;
 
 	XDNA_ERR(xdna, "Start fw logging exit. msi_idx:%d, curr_ts:%llu, buffp:%p, metap:%p",
@@ -548,18 +545,22 @@ fail:
 
 int aie2_control_fw_logging(struct amdxdna_dev_hdl *ndev, enum fw_logging_op op, void *args)
 {
-	struct amdxdna_dev *xdna = ndev->xdna;
+	// struct amdxdna_dev *xdna = ndev->xdna;
 	int ret;
 
 	switch (op) {
 	case FW_LOGGING_OP_START:
 		ret = aie2_control_fw_logging_start(ndev);
+		break;
 	case FW_LOGGING_OP_STOP:
 		ret = aie2_control_fw_logging_stop(ndev);
+		break;
 	case FW_LOGGING_OP_FREE:
 		ret = aie2_control_fw_logging_free(ndev);
+		break;
 	case FW_LOGGING_OP_SET:
 		ret = 0;
+		break;
 	default:
 		ret = -EPIPE;
 	}

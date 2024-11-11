@@ -569,11 +569,7 @@ aie2_fw_logging_write(struct file *file, const char __user *ptr, size_t len, lof
 {
 	struct amdxdna_dev_hdl *ndev = file_to_ndev_rw(file);
 	struct amdxdna_dev *xdna = ndev->xdna;
-	// const size_t size = 0x10000; /* 1M */
-	// const size_t size = 0x100;
 	enum fw_logging_op op;
-	// dma_addr_t dma_addr;
-	// void *buff;
 	int ret, val;
 
 	ret = kstrtoint_from_user(ptr, len, 10, &val);
@@ -596,7 +592,7 @@ aie2_fw_logging_write(struct file *file, const char __user *ptr, size_t len, lof
 		return -EAGAIN;
 	}
 
-	return 0;
+	return len;
 }
 
 static void aie2_fw_logging_usage(struct seq_file *m)
@@ -614,8 +610,8 @@ static void aie2_fw_logging_usage(struct seq_file *m)
 static int aie2_fw_logging_show(struct seq_file *m, void *unused)
 {
 	struct amdxdna_dev_hdl *ndev = m->private;
-	struct amdxdna_dev *xdna = ndev->xdna;
-	int ret;
+	// struct amdxdna_dev *xdna = ndev->xdna;
+	// int ret;
 
 	if (!ndev->fw_logging.addr) {
 		aie2_fw_logging_usage(m);

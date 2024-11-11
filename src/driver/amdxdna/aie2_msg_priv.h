@@ -429,7 +429,6 @@ struct stop_event_trace_req {
 
 struct stop_event_trace_resp {
 	enum aie2_msg_status		status;
-	u64				current_timestamp;
 } __packed;
 
 struct set_event_trace_categories_req {
