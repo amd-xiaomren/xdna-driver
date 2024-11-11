@@ -438,13 +438,52 @@ int aie2_register_asyn_event_msg(struct amdxdna_dev_hdl *ndev, dma_addr_t addr, 
 
 static int aie2_control_fw_logging_free(struct amdxdna_dev_hdl *ndev)
 {
+	struct amdxdna_dev *xdna = ndev->xdna;
+	struct device *dev = xdna->ddev.dev;
+	const size_t size = ndev->fw_logging.size;
+	dma_addr_t dma_addr = ndev->fw_logging.dma_addr;
+	u8 *buff_addr = ndev->fw_logging.addr;
+
+	XDNA_ERR(xdna, "Free fw logging enter, on:%d", ndev->fw_logging.on);
+	if (ndev->fw_logging.on) {
+		XDNA_ERR(xdna, "stop logging first");
+		return -EINVAL;
+	}
+
+	dma_free_coherent(dev, size, buff_addr, dma_addr);
+	memset(&ndev->fw_logging, 0, sizeof(struct fw_logging));
+
+	XDNA_ERR(xdna, "Free fw logging exit");
 	return 0;
 }
 
 static int aie2_control_fw_logging_stop(struct amdxdna_dev_hdl *ndev)
 {
 	DECLARE_AIE2_MSG(stop_event_trace, IPU_MSG_STOP_EVENT_TRACE);
+	struct amdxdna_dev *xdna = ndev->xdna;
+	struct device *dev = xdna->ddev.dev;
+	const size_t size = ndev->fw_logging.size;
+	dma_addr_t dma_addr = ndev->fw_logging.dma_addr;
+	u8 *buff_addr = ndev->fw_logging.addr;
+	int ret;
 
+	XDNA_ERR(xdna, "Stop fw logging enter, on:%d", ndev->fw_logging.on);
+	if (!ndev->fw_logging.on)
+		return 0;
+
+	ret = aie2_send_mgmt_msg_wait(ndev, &msg);
+	if (ret) {
+		XDNA_ERR(xdna, "Failed to stop fw logging, ret %d", ret);
+		return -EAGAIN;
+	}
+
+	if (resp.status != AIE2_STATUS_SUCCESS) {
+		XDNA_ERR(xdna, "Stop fw logging resp error, status 0x%x", resp.status);
+		return -EAGAIN;
+	}
+
+	ndev->fw_logging.on = false;
+	XDNA_ERR(xdna, "Stop fw logging exit. curr_ts:%llu", resp.current_timestamp);
 	return 0;
 }
 
@@ -453,13 +492,13 @@ static int aie2_control_fw_logging_start(struct amdxdna_dev_hdl *ndev)
 	DECLARE_AIE2_MSG(start_event_trace, IPU_MSG_START_EVENT_TRACE);
 	struct amdxdna_dev *xdna = ndev->xdna;
 	struct device *dev = xdna->ddev.dev;
-	// const size_t size = SZ_1M;
-	const size_t size = SZ_256;
+	const size_t size = SZ_1M;
+	// const size_t size = SZ_1K;
 	dma_addr_t dma_addr;
 	u8 *buff_addr;
 	int ret;
 
-	XDNA_ERR(xdna, "Start fw logging, on:%d", ndev->fw_logging.on);
+	XDNA_ERR(xdna, "Start fw logging enter, on:%d", ndev->fw_logging.on);
 	if (ndev->fw_logging.on)
 		return 0;
 
@@ -493,7 +532,7 @@ static int aie2_control_fw_logging_start(struct amdxdna_dev_hdl *ndev)
 	ndev->fw_logging.metadata = (u8 *)buff_addr - sizeof(struct event_trace_metadata);
 	ndev->fw_logging.msi_idx = resp.msi_idx;
 
-	XDNA_ERR(xdna, "Start fw logging completed. msi_idx:%d, curr_ts:%llu, buffp:%p, metap:%p",
+	XDNA_ERR(xdna, "Start fw logging exit. msi_idx:%d, curr_ts:%llu, buffp:%p, metap:%p",
 		 resp.msi_idx, resp.current_timestamp, buff_addr, ndev->fw_logging.metadata);
 
 	return 0;
