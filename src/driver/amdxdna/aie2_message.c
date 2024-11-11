@@ -436,23 +436,75 @@ int aie2_register_asyn_event_msg(struct amdxdna_dev_hdl *ndev, dma_addr_t addr, 
 	return xdna_mailbox_send_msg(ndev->mgmt_chann, &msg, TX_TIMEOUT);
 }
 
-static int aie2_control_fw_logging_start(struct amdxdna_dev_hdl *ndev)
+static int aie2_control_fw_logging_free(struct amdxdna_dev_hdl *ndev)
 {
-	DECLARE_AIE2_MSG(start_event_trace, IPU_MSG_START_EVENT_TRACE);
-
 	return 0;
 }
 
 static int aie2_control_fw_logging_stop(struct amdxdna_dev_hdl *ndev)
 {
-	DECLARE_AIE2_MSG(start_event_trace, IPU_MSG_STOP_EVENT_TRACE);
+	DECLARE_AIE2_MSG(stop_event_trace, IPU_MSG_STOP_EVENT_TRACE);
 
 	return 0;
 }
 
-static int aie2_control_fw_logging_free(struct amdxdna_dev_hdl *ndev)
+static int aie2_control_fw_logging_start(struct amdxdna_dev_hdl *ndev)
 {
+	DECLARE_AIE2_MSG(start_event_trace, IPU_MSG_START_EVENT_TRACE);
+	struct amdxdna_dev *xdna = ndev->xdna;
+	struct device *dev = xdna->ddev.dev;
+	// const size_t size = SZ_1M;
+	const size_t size = SZ_256;
+	dma_addr_t dma_addr;
+	u8 *buff_addr;
+	int ret;
+
+	XDNA_ERR(xdna, "Start fw logging, on:%d", ndev->fw_logging.on);
+	if (ndev->fw_logging.on)
+		return 0;
+
+	buff_addr = dma_alloc_coherent(dev, size, &dma_addr, DMA_BIDIRECTIONAL, GFP_KERNEL);
+	if (!buff_addr)
+		return -ENOMEM;
+	drm_clflush_virt_range(buff_addr, size); /* device can access */
+
+	req.dram_buf_addr = dma_addr;
+	req.dram_buf_size = size;
+	req.event_trace_categories = EVENT_TRACE_CATEGORY_OVERVIEW;
+	req.event_trace_timestamp = EVENT_TRACE_TIMESTAMP_CPU_CCOUNT;
+	req.event_trace_dest = EVENT_TRACE_DEST_DRAM;
+
+	ret = aie2_send_mgmt_msg_wait(ndev, &msg);
+	if (ret) {
+		XDNA_ERR(xdna, "Failed to start fw logging, ret %d", ret);
+		goto fail;
+	}
+
+	if (resp.status != AIE2_STATUS_SUCCESS) {
+		XDNA_ERR(xdna, "Start fw logging resp error, status 0x%x", resp.status);
+		ret = -EINVAL;
+		goto fail;
+	}
+
+	ndev->fw_logging.on = true;
+	ndev->fw_logging.size = size;
+	ndev->fw_logging.addr = buff_addr;
+	ndev->fw_logging.dma_addr = dma_addr;
+	ndev->fw_logging.metadata = (u8 *)buff_addr - sizeof(struct event_trace_metadata);
+	ndev->fw_logging.msi_idx = resp.msi_idx;
+
+	XDNA_ERR(xdna, "Start fw logging completed. msi_idx:%d, curr_ts:%llu, buffp:%p, metap:%p",
+		 resp.msi_idx, resp.current_timestamp, buff_addr, ndev->fw_logging.metadata);
+
 	return 0;
+
+fail:
+	dma_free_coherent(dev, size, buff_addr, dma_addr);
+	// ndev->fw_logging.on = false;
+	// ndev->fw_logging.size = 0;
+	// ndev->fw_logging.addr = NULL;
+	memset(&ndev->fw_logging, 0, sizeof(struct fw_logging));
+	return ret;
 }
 
 int aie2_control_fw_logging(struct amdxdna_dev_hdl *ndev, enum fw_logging_op op, void *args)

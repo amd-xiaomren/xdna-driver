@@ -383,6 +383,17 @@ struct async_event_msg_resp {
 	enum async_event_type	type;
 } __packed;
 
+struct event_trace_log_entry {
+	u8	data[16];
+};
+
+struct event_trace_metadata {
+	u64	tail_offset;
+	u64	head_offset;
+	u32	version;
+	u8	padding[44];
+};
+
 enum event_trace_destination {
 	EVENT_TRACE_DEST_DEBUG_BUS,
 	EVENT_TRACE_DEST_DRAM,

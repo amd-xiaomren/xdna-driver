@@ -180,12 +180,12 @@ enum fw_logging_op {
 };
 
 struct fw_logging {
-	bool			on;
-	size_t			size;
-	void			*addr;
-	dma_addr_t		dma_addr;
-	u32			head_idx;
-	u32			tail_idx;
+	bool				on;
+	size_t				size;
+	void				*addr;
+	dma_addr_t			dma_addr;
+	struct event_trace_metadata	*metadata;
+	u32				msi_idx;
 };
 
 #ifdef AMDXDNA_DEVEL
